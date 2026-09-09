@@ -1,0 +1,35 @@
+{
+  "role": "Known-answer test vectors for the five lightweight AEAD schemes added in the extended comparison",
+  "fetched_at_utc": "2026-09-08T20:00:00+00:00",
+  "sources": {
+    "lwc-finalists": {
+      "url": "https://github.com/rweather/lwc-finalists",
+      "commit": "77b23e672543df736bdcc8577590e8957fe0c58c",
+      "commit_date": "2022-06-28",
+      "role": "Reference C implementations and generated KAT files for all ten NIST Lightweight Cryptography finalists",
+      "upstream_path": "test/kat/",
+      "license": "MIT"
+    }
+  },
+  "vectors_per_file": 1089,
+  "vector_format": "Count / Key / Nonce / PT / AD / CT blocks; every plaintext length 0-32 x every AD length 0-32",
+  "aes_128_ccm_note": "AES-128-CCM has no NIST-LWC vector file. Its pure-Python implementation is validated by exact byte-for-byte agreement with OpenSSL (via the cryptography package) over randomised inputs; see tests/test_lightweight_kat.py.",
+  "files": [
+    {
+      "path": "third_party/lwc_kat/TinyJAMBU-128.txt",
+      "sha256": "1d138e366e0896716f3570323f781d06cba63ccd5ed87ad3f04d370c8965a742"
+    },
+    {
+      "path": "third_party/lwc_kat/Xoodyak.txt",
+      "sha256": "6064e17e8ecba23bea6419d2e1da5004241c8cf1436be82be6fef4847e838666"
+    },
+    {
+      "path": "third_party/lwc_kat/Schwaemm256-128.txt",
+      "sha256": "1bfdd3439c0b89441d77149d28e5c13d54ddd8ca5671a5247d2d2923eae23851"
+    },
+    {
+      "path": "third_party/lwc_kat/GIFT-COFB.txt",
+      "sha256": "d1bd2727d0579f8bca49478eb259dcf0d2cdf5afc41f1a549a0bcc2328400917"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+# Dependencies for:
+#   Performance Evaluation of Ascon-AEAD128 and AES-128-GCM
+#   for Secure IoT Communication -- A Proof-of-Concept Study
+#
+# Install with:
+#     pip install -r requirements.txt
+#
+# NOTE: Ascon is NOT installed from PyPI. The `ascon` package on PyPI
+# implements only the obsolete Ascon v1.2 competition candidates
+# (Ascon-128 / Ascon-128a / Ascon-80pq), NOT the standardised Ascon-AEAD128
+# from NIST SP 800-232. Installing it would silently invalidate this study.
+# The reference implementation is vendored instead:
+#     python scripts/setup_ascon.py
+# See README.md, section "Ascon setup".
+
+# --- Cryptography ---------------------------------------------------------
+# Provides AES-128-GCM via cryptography.hazmat.primitives.ciphers.aead.AESGCM,
+# backed by OpenSSL. Version 42+ ships modern OpenSSL builds with AES-NI
+# dispatch, which materially affects the AES-GCM measurements.
+cryptography>=42.0.0
+
+# --- Data handling and statistics ----------------------------------------
+pandas>=2.0.0
+numpy>=1.24.0
+
+# --- Figures --------------------------------------------------------------
+matplotlib>=3.7.0
+
+# --- Environment capture --------------------------------------------------
+# Used by src/environment_info.py for CPU core counts, clock speed and RAM.
+# The project degrades gracefully if it is absent, but reproducibility
+# metadata is less complete.
+psutil>=5.9.0
+
+# --- Testing --------------------------------------------------------------
+pytest>=7.4.0

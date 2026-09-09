@@ -1,0 +1,124 @@
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ---------------------------------------------------------------------------
+# Virtual environments
+# ---------------------------------------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+.env
+env.bak/
+venv.bak/
+
+# ---------------------------------------------------------------------------
+# Testing and tooling caches
+# ---------------------------------------------------------------------------
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+
+# ---------------------------------------------------------------------------
+# IDE and editor
+# ---------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ---------------------------------------------------------------------------
+# Jupyter
+# ---------------------------------------------------------------------------
+.ipynb_checkpoints/
+
+# ---------------------------------------------------------------------------
+# Generated experimental output
+# ---------------------------------------------------------------------------
+# DECISION AND JUSTIFICATION -- read this before changing it.
+#
+# Two categories of generated file are treated differently, on purpose.
+#
+# EXCLUDED: data/sensor_messages.csv and results/raw_results.csv.
+#   Both are large (the raw timing file reaches tens of megabytes on a full
+#   run) and both are exactly reproducible: the dataset from the seed in
+#   src/config.py, the raw timings by re-running the benchmark. Git handles
+#   large, frequently-rewritten CSVs badly, and a repository whose history is
+#   dominated by regenerable data is hard to review.
+#
+# COMMITTED: summary_results.csv, security_results.csv, kat_results.csv,
+#   overhead_results.csv, memory_results.csv, environment.json and every
+#   figure in results/graphs/.
+#   These are the evidence the report cites. They are small, they change
+#   rarely, and committing them means the repository at submission time
+#   contains the exact numbers that appear in the write-up. An examiner can
+#   verify a figure in the report against the file that produced it without
+#   re-running anything, and environment.json records the machine those
+#   numbers came from.
+#
+# If your supervisor prefers a fully self-contained archive, delete the two
+# exclusion lines below and commit everything.
+data/sensor_messages.csv
+results/raw_results.csv
+
+# ---------------------------------------------------------------------------
+# Vendored third-party code
+# ---------------------------------------------------------------------------
+# EXCLUDED, with PROVENANCE.json committed instead.
+#
+# third_party/ holds code and test vectors copied from two upstream
+# repositories (pyascon and ascon-c, both CC0-1.0). Re-distributing someone
+# else's source inside a student repository is avoidable: PROVENANCE.json
+# records the URL, the exact commit hash and the SHA-256 of every vendored
+# file, which is strictly more useful for reproducibility than a copy with no
+# version information. Anyone can restore the files with:
+#     python scripts/setup_ascon.py
+#
+# If you would rather submit a single archive that runs with no network
+# access, remove these three lines and commit third_party/ as well -- the CC0
+# licence explicitly permits it.
+third_party/pyascon/
+third_party/ascon_kat/
+!third_party/PROVENANCE.json
+
+# ---------------------------------------------------------------------------
+# Temporary clones left behind by a manual Ascon setup
+# ---------------------------------------------------------------------------
+temp_pyascon/
+temp_asconc/
+
+
+results/extended/raw_extended.csv
+results/extended/latency_samples.csv

@@ -1,0 +1,26 @@
+{
+  "fetched_at_utc": "2026-08-22T10:43:19+00:00",
+  "sources": {
+    "pyascon": {
+      "role": "Ascon-AEAD128 implementation used by the experiment",
+      "url": "https://github.com/meichlseder/pyascon",
+      "commit": "ed24e54abf9507d26fa49b46a56091570c7e743e",
+      "commit_date": "2025-11-18 13:23:23 +0100",
+      "license": "CC0-1.0",
+      "author": "Maria Eichlseder (Ascon co-designer)",
+      "vendored_file": "third_party/pyascon/ascon.py",
+      "sha256": "b799653fc09e56fc4eb72c90b3574b967b3ead4c337b2402123148d5b1873eda"
+    },
+    "ascon-c": {
+      "role": "Official known-answer test vectors for conformance checking",
+      "url": "https://github.com/ascon/ascon-c",
+      "commit": "446347f21b209f3921c65ece70027c366cbe1693",
+      "commit_date": "2026-01-28 17:01:03 +0100",
+      "license": "CC0-1.0",
+      "author": "The Ascon team",
+      "vendored_file": "third_party/ascon_kat/LWC_AEAD_KAT_128_128.txt",
+      "upstream_path": "crypto_aead/asconaead128/LWC_AEAD_KAT_128_128.txt",
+      "sha256": "bbbc34692fe05e5fda0a3b025585622ab3e3747495e5e3655b29aae8c2a4bd33"
+    }
+  }
+}

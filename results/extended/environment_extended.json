@@ -1,0 +1,97 @@
+{
+  "captured_at_utc": "2026-09-08T22:17:25+00:00",
+  "experiment": "extended lightweight-AEAD comparison",
+  "reference_algorithm": "Ascon-AEAD128",
+  "algorithms": [
+    {
+      "name": "Ascon-AEAD128",
+      "tier": "pure-python",
+      "role": "NIST SP 800-232 standard (the algorithm under study)",
+      "key_bits": 128,
+      "nonce_bits": 128,
+      "tag_bits": 128
+    },
+    {
+      "name": "TinyJAMBU-128",
+      "tier": "pure-python",
+      "role": "NIST-LWC finalist (smallest hardware footprint, 64-bit tag)",
+      "key_bits": 128,
+      "nonce_bits": 96,
+      "tag_bits": 64
+    },
+    {
+      "name": "Xoodyak",
+      "tier": "pure-python",
+      "role": "NIST-LWC finalist (Keccak team; closest structural rival)",
+      "key_bits": 128,
+      "nonce_bits": 128,
+      "tag_bits": 128
+    },
+    {
+      "name": "Schwaemm256-128",
+      "tier": "pure-python",
+      "role": "NIST-LWC finalist (SPARKLE; software-oriented ARX)",
+      "key_bits": 128,
+      "nonce_bits": 256,
+      "tag_bits": 128
+    },
+    {
+      "name": "GIFT-COFB",
+      "tier": "pure-python",
+      "role": "NIST-LWC finalist (block-cipher based, not a sponge)",
+      "key_bits": 128,
+      "nonce_bits": 128,
+      "tag_bits": 128
+    },
+    {
+      "name": "AES-128-CCM",
+      "tier": "pure-python",
+      "role": "Deployed IoT AEAD (IEEE 802.15.4 / Zigbee / BLE)",
+      "key_bits": 128,
+      "nonce_bits": 96,
+      "tag_bits": 128
+    },
+    {
+      "name": "AES-128-GCM",
+      "tier": "native-c",
+      "role": "Established baseline (NIST SP 800-38D, OpenSSL + AES-NI)",
+      "key_bits": 128,
+      "nonce_bits": 96,
+      "tag_bits": 128
+    }
+  ],
+  "python": {
+    "version": "3.11.15 (main, Mar  3 2026, 09:26:23) [GCC 13.3.0]",
+    "implementation": "CPython"
+  },
+  "operating_system": {
+    "system": "Linux",
+    "release": "6.18.44-fc-v24",
+    "platform": "Linux-6.18.44-fc-v24-x86_64-with-glibc2.39"
+  },
+  "cpu": {
+    "machine": "x86_64",
+    "processor": "x86_64"
+  },
+  "openssl": "OpenSSL 3.5.6 7 Apr 2026",
+  "config": {
+    "profile": "full",
+    "random_seed": 42,
+    "message_sizes": [
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096
+    ],
+    "warmup_iterations": 20,
+    "benchmark_iterations": 100,
+    "experiment_repetitions": 10,
+    "memory_samples": 10,
+    "aad_size": 48
+  },
+  "interpretation_warning": "Pure-Python and native-c rows are NOT comparable as algorithm measurements. Compare within a tier; across tiers you are comparing implementations. See docs/EXTENDED_ALGORITHMS.md."
+}

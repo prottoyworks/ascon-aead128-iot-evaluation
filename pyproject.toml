@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "iot-crypto-study"
+version = "1.0.0"
+description = "Performance evaluation of Ascon-AEAD128 and AES-128-GCM for secure IoT communication"
+requires-python = ">=3.11"
+dependencies = [
+    "cryptography>=42.0.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "matplotlib>=3.7.0",
+    "psutil>=5.9.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.4.0"]
+
+[tool.setuptools]
+packages = ["src"]
+
+# --------------------------------------------------------------------------
+# pytest configuration
+#
+# `rootdir`-relative importmode=importlib plus the sys.path insertion in
+# tests/conftest.py is what makes `pytest` work from any directory without a
+# PYTHONPATH dance -- the single most common source of "No module named 'src'".
+# --------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "7.4"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --strict-markers --tb=short"
+markers = [
+    "conformance: known-answer tests against official NIST SP 800-232 vectors",
+    "slow: tests that take more than a few seconds",
+]

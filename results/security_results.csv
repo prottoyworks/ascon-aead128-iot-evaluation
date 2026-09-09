@@ -1,0 +1,21 @@
+algorithm,test_id,test_name,property_tested,trials,expected_result,actual_result,unexpected_outcomes,passed,notes
+AES-128-GCM,A,valid_message,Correctness / availability,100,ACCEPTED,ACCEPTED,0,True,"100 independent trials, fresh key/nonce/message each."
+AES-128-GCM,B,ciphertext_tampering,Payload integrity,100,REJECTED,REJECTED,0,True,"100 independent trials, fresh key/nonce/message each."
+AES-128-GCM,C,aad_tampering,Metadata integrity,100,REJECTED,REJECTED,0,True,"100 independent trials, fresh key/nonce/message each."
+AES-128-GCM,D,wrong_key,Authentication,100,REJECTED,REJECTED,0,True,"100 independent trials, fresh key/nonce/message each."
+AES-128-GCM,E,truncated_ciphertext,Safe failure on malformed input,100,REJECTED,REJECTED,0,True,"100 independent trials, fresh key/nonce/message each."
+AES-128-GCM,F,tag_tampering,Tag integrity,100,REJECTED,REJECTED,0,True,"100 independent trials, fresh key/nonce/message each."
+AES-128-GCM,G,nonce_mismatch,Nonce binding,100,REJECTED,REJECTED,0,True,"100 independent trials, fresh key/nonce/message each."
+AES-128-GCM,C2,aad_device_impersonation,Metadata integrity (device identity),100,REJECTED,REJECTED,0,True,"device_id relabelled ""WH-001"" -> ""WH-999"" in the cleartext AAD."
+AES-128-GCM,H,replay_exact_duplicate,"Freshness (protocol layer, not AEAD)",10,REJECTED,REJECTED,0,True,"AEAD tag verified on 10/10 replayed packets, confirming that replay defence comes from the sequence check, not from the cipher."
+AES-128-GCM,I,replay_stale_sequence,"Freshness (protocol layer, not AEAD)",10,REJECTED,REJECTED,0,True,Out-of-order older sequence number delivered after a newer one.
+Ascon-AEAD128,A,valid_message,Correctness / availability,100,ACCEPTED,ACCEPTED,0,True,"100 independent trials, fresh key/nonce/message each."
+Ascon-AEAD128,B,ciphertext_tampering,Payload integrity,100,REJECTED,REJECTED,0,True,"100 independent trials, fresh key/nonce/message each."
+Ascon-AEAD128,C,aad_tampering,Metadata integrity,100,REJECTED,REJECTED,0,True,"100 independent trials, fresh key/nonce/message each."
+Ascon-AEAD128,D,wrong_key,Authentication,100,REJECTED,REJECTED,0,True,"100 independent trials, fresh key/nonce/message each."
+Ascon-AEAD128,E,truncated_ciphertext,Safe failure on malformed input,100,REJECTED,REJECTED,0,True,"100 independent trials, fresh key/nonce/message each."
+Ascon-AEAD128,F,tag_tampering,Tag integrity,100,REJECTED,REJECTED,0,True,"100 independent trials, fresh key/nonce/message each."
+Ascon-AEAD128,G,nonce_mismatch,Nonce binding,100,REJECTED,REJECTED,0,True,"100 independent trials, fresh key/nonce/message each."
+Ascon-AEAD128,C2,aad_device_impersonation,Metadata integrity (device identity),100,REJECTED,REJECTED,0,True,"device_id relabelled ""WH-001"" -> ""WH-999"" in the cleartext AAD."
+Ascon-AEAD128,H,replay_exact_duplicate,"Freshness (protocol layer, not AEAD)",10,REJECTED,REJECTED,0,True,"AEAD tag verified on 10/10 replayed packets, confirming that replay defence comes from the sequence check, not from the cipher."
+Ascon-AEAD128,I,replay_stale_sequence,"Freshness (protocol layer, not AEAD)",10,REJECTED,REJECTED,0,True,Out-of-order older sequence number delivered after a newer one.

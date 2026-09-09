@@ -1,0 +1,9 @@
+metric,value
+algorithm,Ascon-AEAD128
+standard,NIST SP 800-232
+source_file,F:\CSE406\Project\iot_crypto_project\third_party\ascon_kat\LWC_AEAD_KAT_128_128.txt
+vectors_total,1089
+encrypt_matches,1089
+decrypt_matches,1089
+failed_counts,
+passed,True
