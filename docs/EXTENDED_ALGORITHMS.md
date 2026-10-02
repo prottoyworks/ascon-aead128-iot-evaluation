@@ -114,6 +114,17 @@ process.
 | End-to-end secured-message rate on the project's own sensor traffic | `results/extended/workload_extended.csv` | no |
 | Machine, interpreter, OpenSSL, algorithm parameters | `results/extended/environment_extended.json` | -- |
 
+**What this script does *not* measure, and where to find it.** Conformance and
+authenticated security functionality are not timing properties, so they are not
+run here. They are produced for all seven algorithms by the core commands --
+`python main.py kat` writes `results/kat_results.csv` (1089 official vectors per
+implemented algorithm, 6534 in total) and `python main.py security-tests` writes
+`results/security_results.csv` (ten attack scenarios per algorithm, 70 rows),
+which `python main.py analyze` then renders as figure 20. Run those before
+quoting any figure from this script: a timing measurement of an implementation
+that computes the wrong function measures nothing, which is also why
+`run_extended_comparison.py` aborts if any known-answer test fails.
+
 On memory: `tracemalloc` observes CPython heap allocations only. It cannot see
 OpenSSL's C-side buffers, and a Python integer holding a 64-bit lane costs far
 more than the lane itself. Treat `memory_extended.csv` as a *relative* indicator
@@ -168,9 +179,15 @@ into a single sitting without weakening the statistics that matter.
 | 16 | `graph16_lw_peak_memory.png` | Transient Python-heap use per operation (same tier only) |
 | 17 | `graph17_lw_end_to_end_rate.png` | Secured messages per second on the real synthetic sensor traffic |
 | 18 | `graph18_lw_multimetric_summary.png` | Normalised multi-metric matrix plus an explicitly arbitrary composite |
+| 19 | `graph19_lw_ascon_vs_finalists.png` | **Ascon against the four NIST-LWC finalists only -- the figure with no implementation-tier confound in it** |
+| 20 | `graph20_security_matrix.png` | **Authenticated security functionality: all seven algorithms against ten attacks, plus blind-forgery resistance.** Produced by `python main.py analyze`, not by this script, because it reads `results/security_results.csv` rather than timing data. |
 
-Figures 13 and 14 are the two to put on a slide. Figure 15 is the one whose
-conclusion survives being moved to different hardware.
+Figure 19 is the one to lead with: five pure-Python implementations, each
+validated against 1089 official vectors, measured through one harness on one
+machine, with the algorithm as the only variable. Figure 20 is the one that
+answers the first dimension of the research question. Figure 15 is the one whose
+conclusion survives being moved to different hardware. Figures 13 and 14 are the
+best summaries of the timing result.
 
 ## 9. Honest limitations of the extension
 

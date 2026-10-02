@@ -1,9 +1,7 @@
-metric,value
-algorithm,Ascon-AEAD128
-standard,NIST SP 800-232
-source_file,F:\CSE406\Project\iot_crypto_project\third_party\ascon_kat\LWC_AEAD_KAT_128_128.txt
-vectors_total,1089
-encrypt_matches,1089
-decrypt_matches,1089
-failed_counts,
-passed,True
+algorithm,standard,method,vector_source,vectors_total,encrypt_matches,decrypt_matches,failed_counts,passed
+Ascon-AEAD128,NIST SP 800-232,official published test vectors,/home/claude/repo/third_party/ascon_kat/LWC_AEAD_KAT_128_128.txt,1089,1089,1089,,True
+TinyJAMBU-128,NIST LWC submission,official published test vectors,/home/claude/repo/third_party/lwc_kat/TinyJAMBU-128.txt,1089,1089,1089,,True
+Xoodyak,NIST LWC submission,official published test vectors,/home/claude/repo/third_party/lwc_kat/Xoodyak.txt,1089,1089,1089,,True
+Schwaemm256-128,NIST LWC submission,official published test vectors,/home/claude/repo/third_party/lwc_kat/Schwaemm256-128.txt,1089,1089,1089,,True
+GIFT-COFB,NIST LWC submission,official published test vectors,/home/claude/repo/third_party/lwc_kat/GIFT-COFB.txt,1089,1089,1089,,True
+AES-128-CCM,NIST SP 800-38C,cross-validation against OpenSSL,"cryptography/OpenSSL AESCCM, 33x33 length grid",1089,1089,1089,,True

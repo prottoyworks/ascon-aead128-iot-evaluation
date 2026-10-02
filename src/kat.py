@@ -209,3 +209,229 @@ def write_kat_report(report: KatReport, path: Path = KAT_RESULTS_CSV) -> Path:
         writer.writerow(["failed_counts", ";".join(str(c) for c in report.failures)])
         writer.writerow(["passed", report.passed])
     return path
+
+
+# ==========================================================================
+# Conformance across the whole comparison set
+# ==========================================================================
+# Everything above this line concerns Ascon-AEAD128 alone, because the core
+# study compares two algorithms and only one of them is implemented here (the
+# AES-128-GCM path is OpenSSL, already validated by its own project).
+#
+# The extension adds five more algorithms, four of which are pure-Python
+# implementations written for this project.  A timing measurement of an
+# implementation that computes the wrong function measures nothing, so each of
+# those has to clear the same bar Ascon does: reproduce the published vectors
+# of its own specification, byte for byte, before any number it produces is
+# quoted.  The code below runs that check for every algorithm and writes one
+# table, so the repository carries the evidence instead of requiring a reader
+# to install pytest and take the result on trust.
+# --------------------------------------------------------------------------
+
+from .config import ALG_AES_CCM, LWC_KAT_DIR  # noqa: E402
+
+#: Algorithm name -> official NIST-LWC vector file in third_party/lwc_kat/.
+#:
+#: AES-128-CCM is absent on purpose: it was never a NIST-LWC candidate, so no
+#: vector file of this form exists for it.  It is validated differently, by
+#: :func:`run_openssl_cross_check` below.
+LWC_KAT_FILES: dict[str, str] = {
+    "TinyJAMBU-128": "TinyJAMBU-128.txt",
+    "Xoodyak": "Xoodyak.txt",
+    "Schwaemm256-128": "Schwaemm256-128.txt",
+    "GIFT-COFB": "GIFT-COFB.txt",
+}
+
+
+@dataclass(frozen=True)
+class ConformanceResult:
+    """One algorithm's conformance outcome, in a form that tabulates."""
+
+    algorithm: str
+    standard: str
+    method: str  #: how conformance was established
+    vector_source: str
+    total: int
+    encrypt_matches: int
+    decrypt_matches: int
+    failures: list[int]
+
+    @property
+    def passed(self) -> bool:
+        return (
+            self.total > 0
+            and self.encrypt_matches == self.total
+            and self.decrypt_matches == self.total
+        )
+
+
+def run_vector_file(
+    cipher_cls, path: Path, algorithm: str, standard: str, limit: int | None = None
+) -> ConformanceResult:
+    """Drive one cipher through a NIST-LWC format vector file.
+
+    The parser is :func:`parse_kat_file`, unchanged -- all NIST-LWC AEAD vector
+    files share one format, which is the reason a single reader serves both the
+    Ascon file and the four finalist files.
+    """
+    vectors = parse_kat_file(path)
+    if limit is not None:
+        vectors = vectors[:limit]
+
+    encrypt_matches = 0
+    decrypt_matches = 0
+    failures: list[int] = []
+
+    for vector in vectors:
+        cipher = cipher_cls(vector.key)
+        produced = cipher.encrypt(vector.nonce, vector.plaintext, vector.associated_data)
+        if produced != vector.ciphertext:
+            failures.append(vector.count)
+            continue
+        encrypt_matches += 1
+        try:
+            recovered = cipher.decrypt(
+                vector.nonce, vector.ciphertext, vector.associated_data
+            )
+        except AuthenticationError:
+            failures.append(vector.count)
+            continue
+        if recovered == vector.plaintext:
+            decrypt_matches += 1
+        else:
+            failures.append(vector.count)
+
+    return ConformanceResult(
+        algorithm=algorithm,
+        standard=standard,
+        method="official published test vectors",
+        vector_source=str(path),
+        total=len(vectors),
+        encrypt_matches=encrypt_matches,
+        decrypt_matches=decrypt_matches,
+        failures=failures,
+    )
+
+
+def run_openssl_cross_check(limit: int | None = None) -> ConformanceResult:
+    """Validate the pure-Python AES-128-CCM against OpenSSL.
+
+    AES-128-CCM has no NIST-LWC vector file, so conformance is established the
+    other way a cryptographic implementation can be checked: exact agreement
+    with an independent, widely deployed implementation of the same standard
+    (NIST SP 800-38C, via OpenSSL through ``cryptography``).
+
+    To keep the evidence comparable with the other algorithms, the inputs cover
+    the same grid the NIST-LWC files use -- every plaintext length 0-32 against
+    every associated-data length 0-32, which is 33 x 33 = 1089 cases -- with
+    keys and nonces derived deterministically from the case index so the run is
+    reproducible.
+    """
+    from cryptography.hazmat.primitives.ciphers.aead import AESCCM
+
+    from .lightweight.aes_ccm import AesCcmPythonCipher
+
+    cases = [(pt_len, ad_len) for pt_len in range(33) for ad_len in range(33)]
+    if limit is not None:
+        cases = cases[:limit]
+
+    encrypt_matches = 0
+    decrypt_matches = 0
+    failures: list[int] = []
+
+    for index, (pt_len, ad_len) in enumerate(cases, start=1):
+        # Deterministic, documented derivation -- no randomness, so the table
+        # is byte-identical on every machine and in every run.
+        key = bytes((index * 7 + i * 31) % 256 for i in range(AesCcmPythonCipher.key_size))
+        nonce = bytes((index * 11 + i * 17) % 256 for i in range(AesCcmPythonCipher.nonce_size))
+        plaintext = bytes((i * 3 + 1) % 256 for i in range(pt_len))
+        aad = bytes((i * 5 + 2) % 256 for i in range(ad_len))
+
+        expected = AESCCM(key, tag_length=AesCcmPythonCipher.tag_size).encrypt(
+            nonce, plaintext, aad or None
+        )
+        produced = AesCcmPythonCipher(key).encrypt(nonce, plaintext, aad)
+        if produced != expected:
+            failures.append(index)
+            continue
+        encrypt_matches += 1
+        try:
+            recovered = AesCcmPythonCipher(key).decrypt(nonce, expected, aad)
+        except AuthenticationError:
+            failures.append(index)
+            continue
+        if recovered == plaintext:
+            decrypt_matches += 1
+        else:
+            failures.append(index)
+
+    return ConformanceResult(
+        algorithm=ALG_AES_CCM,
+        standard="NIST SP 800-38C",
+        method="cross-validation against OpenSSL",
+        vector_source="cryptography/OpenSSL AESCCM, 33x33 length grid",
+        total=len(cases),
+        encrypt_matches=encrypt_matches,
+        decrypt_matches=decrypt_matches,
+        failures=failures,
+    )
+
+
+def run_all_conformance(limit: int | None = None) -> list[ConformanceResult]:
+    """Establish conformance for every algorithm this project implements.
+
+    AES-128-GCM is absent from the table for a reason worth stating: it is not
+    implemented here.  It is OpenSSL, reached through ``cryptography``, and its
+    conformance is the responsibility -- and the validated claim -- of that
+    project rather than of this one.
+    """
+    from .lightweight import BY_NAME
+
+    results: list[ConformanceResult] = [
+        run_vector_file(
+            AsconAead128Cipher,
+            ASCON_KAT_FILE,
+            algorithm="Ascon-AEAD128",
+            standard="NIST SP 800-232",
+            limit=limit,
+        )
+    ]
+    for algorithm, filename in LWC_KAT_FILES.items():
+        results.append(
+            run_vector_file(
+                BY_NAME[algorithm],
+                LWC_KAT_DIR / filename,
+                algorithm=algorithm,
+                standard="NIST LWC submission",
+                limit=limit,
+            )
+        )
+    results.append(run_openssl_cross_check(limit=limit))
+    return results
+
+
+def write_conformance_table(
+    results: list[ConformanceResult], path: Path = KAT_RESULTS_CSV
+) -> Path:
+    """Write one row per algorithm, so the evidence can be cited as a table."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle)
+        writer.writerow([
+            "algorithm", "standard", "method", "vector_source",
+            "vectors_total", "encrypt_matches", "decrypt_matches",
+            "failed_counts", "passed",
+        ])
+        for result in results:
+            writer.writerow([
+                result.algorithm,
+                result.standard,
+                result.method,
+                result.vector_source,
+                result.total,
+                result.encrypt_matches,
+                result.decrypt_matches,
+                ";".join(str(c) for c in result.failures),
+                result.passed,
+            ])
+    return path

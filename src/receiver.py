@@ -41,18 +41,31 @@ from .aead_interface import AeadCipher, AuthenticationError
 from .aes_gcm import AesGcmCipher
 from .ascon_aead import AsconAead128Cipher
 from .config import ALG_AES_GCM, ALG_ASCON
+from .lightweight import LIGHTWEIGHT_CIPHERS
 from .replay_protection import ReplayValidator, ReplayVerdict, StrictSequenceValidator
 from .sensor import SensorReading
 from .serialization import SecurePacket, reassemble
 
 logger = logging.getLogger(__name__)
 
-#: Algorithm label -> cipher class.  Adding a third AEAD later (for the thesis)
-#: means adding one line here; nothing else in the receiver changes.  That is
-#: the seed of the crypto-agility work described in docs/THESIS_EXTENSION.md.
+#: Algorithm label -> cipher class.
+#:
+#: Every AEAD the project evaluates is registered here, which is what makes the
+#: gateway *crypto-agile*: the receiver selects a cipher by the label carried in
+#: the packet and never hard-codes one. The practical consequence is that the
+#: protocol-layer security tests (replay, device impersonation) can be run
+#: against all seven algorithms rather than only the core two -- without this
+#: table, ``SecureReceiver.provision`` rejects the five comparators as unknown
+#: algorithms and the security comparison silently covers two of seven.
+#:
+#: The five lightweight entries are expanded from
+#: :data:`src.lightweight.LIGHTWEIGHT_CIPHERS` rather than listed by hand, so a
+#: cipher added to that package is registered here automatically and cannot be
+#: forgotten.
 CIPHER_REGISTRY: dict[str, type[AeadCipher]] = {
     ALG_AES_GCM: AesGcmCipher,
     ALG_ASCON: AsconAead128Cipher,
+    **{cipher.name: cipher for cipher in LIGHTWEIGHT_CIPHERS},
 }
 
 

@@ -43,6 +43,7 @@ from .config import (
     OP_ENCRYPT,
     OVERHEAD_RESULTS_CSV,
     RAW_RESULTS_CSV,
+    SECURITY_RESULTS_CSV,
     SUMMARY_RESULTS_CSV,
     ExperimentConfig,
 )
@@ -490,9 +491,225 @@ def analyze(config: ExperimentConfig) -> dict[str, object]:
     memory_summary.to_csv(memory_summary_path, index=False)
 
     graphs = generate_graphs(results, summary, memory_summary, config)
+
+    # Figure 20 depends on results/security_results.csv rather than on the
+    # timing data, so it is rendered separately and skipped (not failed) when
+    # the security suite has not been run yet.
+    security_figure = security_matrix_figure(config)
+    if security_figure is not None:
+        graphs = list(graphs) + [security_figure]
+
     return {
         "summary_csv": summary_path,
         "memory_summary_csv": memory_summary_path,
         "graphs": graphs,
         "console": format_console_summary(summary, results, config),
     }
+
+
+# ==========================================================================
+# Figure 20 -- the security comparison
+# ==========================================================================
+# Figures 1-19 answer "how fast, how big, how much overhead".  None of them
+# answers the first dimension the project's own research question names:
+# authenticated security functionality.  That evidence existed only as a CSV,
+# and only for two of the seven algorithms.  This figure is the other half of
+# the comparison -- the half a reader checks first, because a fast cipher that
+# accepts a forged message is worth nothing.
+# --------------------------------------------------------------------------
+
+#: Column order, and the short label each test gets on the figure.
+#:
+#: A is the positive control: it must be ACCEPTED, and a suite in which
+#: everything is rejected would otherwise look like a pass while actually
+#: being broken.  H and I are separated from the rest because they test the
+#: *receiver*, not the cipher -- see the note drawn on the figure.
+SECURITY_TEST_LABELS: dict[str, str] = {
+    "A": "Valid message\n(must ACCEPT)",
+    "B": "Ciphertext\ntampered",
+    "C": "Metadata (AAD)\ntampered",
+    "C2": "Device identity\nforged",
+    "D": "Wrong key",
+    "E": "Truncated\nciphertext",
+    "F": "Tag tampered",
+    "G": "Nonce\nmismatch",
+    "H": "Replay:\nduplicate",
+    "I": "Replay:\nstale sequence",
+}
+
+#: Tests after this point in the column order are protocol-layer, not AEAD.
+_PROTOCOL_LAYER_TESTS: tuple[str, ...] = ("H", "I")
+
+
+def security_matrix_figure(
+    config: ExperimentConfig,
+    path: Path = SECURITY_RESULTS_CSV,
+    directory: Path = GRAPHS_DIR,
+) -> Path | None:
+    """Render the defensive-test outcome for every algorithm as a matrix.
+
+    Returns ``None`` -- rather than raising -- when the security results have
+    not been generated yet, so that ``main.py analyze`` still works for someone
+    who has only run the benchmark.
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    if not path.is_file():
+        return None
+
+    frame = pd.read_csv(path)
+    if frame.empty:
+        return None
+
+    # Row order: Ascon first because it is the algorithm under study, then the
+    # four NIST-LWC finalists, then the two AES modes.  This is the same order
+    # used by the extension figures, so a reader moving between them is not
+    # re-learning a layout.
+    preferred = [
+        "Ascon-AEAD128", "TinyJAMBU-128", "Xoodyak", "Schwaemm256-128",
+        "GIFT-COFB", "AES-128-CCM", "AES-128-GCM",
+    ]
+    present = list(frame["algorithm"].unique())
+    algorithms = [a for a in preferred if a in present] + [
+        a for a in present if a not in preferred
+    ]
+    tests = [t for t in SECURITY_TEST_LABELS if t in set(frame["test_id"])]
+
+    lookup = {
+        (row.algorithm, row.test_id): row
+        for row in frame.itertuples(index=False)
+    }
+
+    passed = np.full((len(algorithms), len(tests)), np.nan)
+    for i, algorithm in enumerate(algorithms):
+        for j, test in enumerate(tests):
+            row = lookup.get((algorithm, test))
+            if row is not None:
+                passed[i, j] = 1.0 if bool(row.passed) else 0.0
+
+    figure, axes = plt.subplots(figsize=(14.8, 5.2))
+    # Two colours only: this is a pass/fail figure, not a gradient.
+    colours = np.zeros(passed.shape + (3,))
+    colours[...] = (0.93, 0.93, 0.93)                      # not run
+    colours[passed == 1.0] = (0.78, 0.90, 0.78)            # pass
+    colours[passed == 0.0] = (0.94, 0.68, 0.66)            # fail
+    axes.imshow(colours, aspect="auto")
+
+    for i, algorithm in enumerate(algorithms):
+        for j, test in enumerate(tests):
+            row = lookup.get((algorithm, test))
+            if row is None:
+                axes.text(j, i, "n/a", ha="center", va="center", fontsize=8,
+                          color="#888888")
+                continue
+            mark = "PASS" if bool(row.passed) else "FAIL"
+            axes.text(j, i - 0.16, mark, ha="center", va="center",
+                      fontsize=8.5, fontweight="bold",
+                      color="#1a5c1a" if bool(row.passed) else "#8c1d18")
+            axes.text(j, i + 0.22,
+                      f"{row.unexpected_outcomes}/{row.trials} unexpected",
+                      ha="center", va="center", fontsize=6.8, color="#444444")
+
+    # ------------------------------------------------------------------
+    # One extra column, deliberately not pass/fail.
+    #
+    # Every cell to the left is green for every algorithm, and that uniformity
+    # is the honest result: these are all standards-conformant AEADs, so none
+    # of them accepts a tampered message.  But "all equal" is not the whole
+    # truth.  The tests above measure whether a *detectable* forgery is
+    # detected; they cannot measure the probability that a blind guess slips
+    # through, which is fixed by tag length and differs across the set.
+    # Showing it here keeps the figure from implying the algorithms are
+    # interchangeable on security when one of them is not.
+    # ------------------------------------------------------------------
+    from .receiver import CIPHER_REGISTRY
+
+    tag_bits = {
+        name: cipher.tag_size * 8 for name, cipher in CIPHER_REGISTRY.items()
+    }
+    best = max(tag_bits.values(), default=128)
+    extra = len(tests)
+    for i, algorithm in enumerate(algorithms):
+        bits = tag_bits.get(algorithm)
+        if bits is None:
+            continue
+        weaker = bits < best
+        axes.add_patch(plt.Rectangle(
+            (extra - 0.5 + 0.06, i - 0.5 + 0.04), 0.88, 0.92,
+            facecolor=(0.99, 0.89, 0.72) if weaker else (0.85, 0.90, 0.96),
+            edgecolor="none", zorder=3,
+        ))
+        axes.text(extra, i - 0.16, f"{bits}-bit tag", ha="center", va="center",
+                  fontsize=8.5, fontweight="bold", zorder=4,
+                  color="#8a5a12" if weaker else "#1f3d63")
+        axes.text(extra, i + 0.22, f"forgery chance 2^-{bits}", ha="center",
+                  va="center", fontsize=6.8, color="#444444", zorder=4)
+    axes.set_xlim(-0.5, extra + 0.5)
+
+    column_labels = [SECURITY_TEST_LABELS[t] for t in tests] + [
+        "Blind forgery\nresistance"
+    ]
+    axes.set_xticks(np.arange(len(column_labels)))
+    axes.set_xticklabels(column_labels, fontsize=8)
+    axes.set_yticks(np.arange(len(algorithms)))
+    axes.set_yticklabels(algorithms, fontsize=9.5)
+    axes.set_xticks(np.arange(-0.5, len(column_labels), 1), minor=True)
+    axes.set_yticks(np.arange(-0.5, len(algorithms), 1), minor=True)
+    axes.grid(which="minor", color="white", linewidth=2.0)
+    axes.tick_params(which="minor", length=0)
+    axes.grid(False)
+
+    # Mark where AEAD stops and the protocol layer begins, and where measured
+    # outcome stops and specification-fixed property begins.
+    first_protocol = next(
+        (j for j, t in enumerate(tests) if t in _PROTOCOL_LAYER_TESTS), None
+    )
+    if first_protocol is not None:
+        axes.axvline(first_protocol - 0.5, color="#333333", linewidth=1.8)
+        axes.annotate(
+            "protocol layer (receiver, not cipher)",
+            xy=(first_protocol - 0.42, -0.60), ha="left", va="center",
+            fontsize=7.4, color="#333333", annotation_clip=False,
+        )
+    axes.axvline(extra - 0.5, color="#333333", linewidth=1.8)
+    axes.annotate(
+        "fixed by the specification, not measured",
+        xy=(extra - 0.42, -0.60), ha="left", va="center",
+        fontsize=7.4, color="#333333", annotation_clip=False,
+    )
+    axes.annotate(
+        "measured outcome of 100 (or 10) independent attack attempts",
+        xy=(-0.42, -0.60), ha="left", va="center",
+        fontsize=7.4, color="#333333", annotation_clip=False,
+    )
+
+    axes.set_title(
+        "Figure 20 - Authenticated security functionality across every algorithm\n"
+        "each cell is an independent attack attempt; PASS means the attack was "
+        "detected and the message refused",
+        fontsize=12, pad=30,
+    )
+
+    total = len(frame)
+    survivors = int((~frame["passed"].astype(bool)).sum())
+    figure.text(
+        0.5, 0.012,
+        f"{total} tests across {len(algorithms)} algorithms; {survivors} unexpected "
+        "outcomes. Tests A-G and C2 exercise the AEAD itself; H and I exercise the "
+        "receiver's freshness check, which is why a cipher alone cannot pass them. "
+        "Uniform PASS is the expected result and is the point: every algorithm here "
+        "is a standards-conformant AEAD, so the speed comparison in figures 9-19 is "
+        "between algorithms offering the same guarantee. The final column is where "
+        "they are not equal -- TinyJAMBU-128's 64-bit tag halves the exponent on "
+        "blind forgery resistance, which is the price of its smaller overhead in "
+        "figure 15.",
+        ha="center", va="bottom", fontsize=7.4, color="#444444", wrap=True,
+    )
+    figure.subplots_adjust(top=0.76, bottom=0.19, left=0.12, right=0.99)
+
+    directory.mkdir(parents=True, exist_ok=True)
+    out = directory / f"graph20_security_matrix.{config.graph_format}"
+    figure.savefig(out, dpi=config.graph_dpi, bbox_inches="tight")
+    plt.close(figure)
+    return out

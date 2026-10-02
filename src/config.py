@@ -45,13 +45,52 @@ PYASCON_DIR: Path = THIRD_PARTY_DIR / "pyascon"
 ASCON_KAT_FILE: Path = THIRD_PARTY_DIR / "ascon_kat" / "LWC_AEAD_KAT_128_128.txt"
 PROVENANCE_JSON: Path = THIRD_PARTY_DIR / "PROVENANCE.json"
 
+#: Official NIST-LWC known-answer vector files for the four finalists added in
+#: the extension.  Unlike the Ascon vectors these are committed to the
+#: repository (see .gitignore), because no setup script fetches them.
+LWC_KAT_DIR: Path = THIRD_PARTY_DIR / "lwc_kat"
+
 
 # --------------------------------------------------------------------------
 # Algorithm identifiers
 # --------------------------------------------------------------------------
 ALG_AES_GCM: str = "AES-128-GCM"
 ALG_ASCON: str = "Ascon-AEAD128"
+
+#: The two algorithms of the *core* timing study.
+#:
+#: This tuple deliberately does NOT include the five lightweight comparators.
+#: The core benchmark (figures 1-8) is a two-algorithm experiment whose results
+#: are already committed to results/; widening it here would silently
+#: invalidate every committed core figure.  The seven-algorithm timing
+#: comparison is a separate experiment -- src/extended_benchmark.py, figures
+#: 9-19 -- run through its own harness so the two can be reported side by side.
 ALGORITHMS: tuple[str, ...] = (ALG_AES_GCM, ALG_ASCON)
+
+# Identifiers for the five lightweight comparators added in the extension.
+# They are declared here so that modules which must name an algorithm without
+# importing its implementation (the receiver registry, the security suite, the
+# figure styling) share one spelling.
+ALG_TINYJAMBU: str = "TinyJAMBU-128"
+ALG_XOODYAK: str = "Xoodyak"
+ALG_SCHWAEMM: str = "Schwaemm256-128"
+ALG_GIFT_COFB: str = "GIFT-COFB"
+ALG_AES_CCM: str = "AES-128-CCM"
+
+#: The five comparators, in the declaration order used by every figure.
+LIGHTWEIGHT_ALGORITHMS: tuple[str, ...] = (
+    ALG_TINYJAMBU,
+    ALG_XOODYAK,
+    ALG_SCHWAEMM,
+    ALG_GIFT_COFB,
+    ALG_AES_CCM,
+)
+
+#: Every algorithm the project evaluates: the core two plus the five
+#: comparators.  This is the set used by the conformance suite (src/kat.py) and
+#: the defensive security suite (src/security_tests.py), both of which are
+#: cheap enough to run across all seven.
+ALL_ALGORITHMS: tuple[str, ...] = ALGORITHMS + LIGHTWEIGHT_ALGORITHMS
 
 # Operations that are timed independently.  Keeping key generation and nonce
 # generation as separate operations (rather than folding them into `encrypt`)

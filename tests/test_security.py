@@ -230,3 +230,28 @@ def test_security_suite_covers_the_required_scenarios():
         "replay_exact_duplicate",
     ):
         assert required in names, f"Missing scenario: {required}"
+
+
+# --------------------------------------------------------------------------
+# Breadth of the defensive suite
+#
+# "Authenticated security functionality" is the first dimension named in the
+# project's research question.  A suite that silently covers two of the seven
+# algorithms under study answers that question for two of them.
+# --------------------------------------------------------------------------
+
+def test_the_defensive_suite_covers_every_algorithm_in_the_study():
+    from src.config import ALL_ALGORITHMS
+
+    covered = {result.algorithm for result in run_all(QUICK)}
+    missing = set(ALL_ALGORITHMS) - covered
+    assert not missing, f"The security suite does not cover: {sorted(missing)}"
+
+
+def test_every_algorithm_passes_every_defensive_test():
+    failures = [
+        f"{result.algorithm}/{result.test_id} ({result.test_name})"
+        for result in run_all(QUICK)
+        if not result.passed
+    ]
+    assert not failures, f"Unexpected security outcomes: {failures}"

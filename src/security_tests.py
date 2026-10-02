@@ -46,6 +46,7 @@ from .aead_interface import AeadCipher, AuthenticationError
 from .aes_gcm import AesGcmCipher
 from .ascon_aead import AsconAead128Cipher, is_available as ascon_available
 from .config import SECURITY_RESULTS_CSV, ExperimentConfig
+from .lightweight import LIGHTWEIGHT_CIPHERS
 from .receiver import SecureReceiver, build_packet
 from .replay_protection import StrictSequenceValidator
 from .sensor import SensorFleet
@@ -343,10 +344,25 @@ def run_aad_substitution_test(
 # --------------------------------------------------------------------------
 
 def run_all(config: ExperimentConfig) -> list[SecurityTestResult]:
-    """Run the whole defensive suite for every available algorithm."""
+    """Run the whole defensive suite for every algorithm in the comparison.
+
+    All seven algorithms are covered, not only the core two.  The reason is
+    that "authenticated security functionality" is the first dimension named in
+    the project's research question, and a study that measures the speed of
+    seven algorithms while testing the security of two invites the obvious
+    objection.  Running the suite across the whole set costs a few seconds and
+    removes it.
+
+    Nothing here is algorithm-specific: every test takes a cipher class or a
+    factory and drives it through :class:`~src.aead_interface.AeadCipher`, so
+    widening the set is a change of input, not of method.  The protocol-layer
+    tests (H, I) additionally require each cipher to be registered in
+    :data:`src.receiver.CIPHER_REGISTRY`, which it now is.
+    """
     cipher_classes: list[type[AeadCipher]] = [AesGcmCipher]
     if ascon_available():
         cipher_classes.append(AsconAead128Cipher)
+    cipher_classes.extend(LIGHTWEIGHT_CIPHERS)
 
     results: list[SecurityTestResult] = []
     for cipher_cls in cipher_classes:

@@ -19,7 +19,10 @@ dependencies = [
 test = ["pytest>=7.4.0"]
 
 [tool.setuptools]
-packages = ["src"]
+# "src" alone silently omits the sub-package, so an installed copy of the
+# project would import without the five lightweight comparators and every
+# extension figure would fail at import time.  Both must be listed.
+packages = ["src", "src.lightweight"]
 
 # --------------------------------------------------------------------------
 # pytest configuration

@@ -125,26 +125,39 @@ def cmd_kat(config: ExperimentConfig) -> int:
 
     limit = 100 if config.profile == "quick" else None
     _log(
-        "Running NIST SP 800-232 known-answer tests"
-        + (f" (first {limit} vectors, quick profile)" if limit else " (all vectors)")
+        "Running known-answer conformance tests for every implemented algorithm"
+        + (f" (first {limit} vectors each, quick profile)" if limit
+           else " (all vectors)")
         + " ..."
     )
     try:
-        report = kat.run_kat(limit=limit)
+        results = kat.run_all_conformance(limit=limit)
     except (kat.KatFileMissing, ValueError) as exc:
         _log(f"KAT run failed: {exc}")
         return 1
 
-    path = kat.write_kat_report(report)
-    _log(f"\nVectors tested   : {report.total}")
-    _log(f"Encrypt matches  : {report.encrypt_matches}/{report.total}")
-    _log(f"Decrypt matches  : {report.decrypt_matches}/{report.total}")
-    _log(f"Result           : {'PASS' if report.passed else 'FAIL'}")
-    if report.failures:
-        _log(f"Failing Count values (first 10): {report.failures[:10]}")
+    path = kat.write_conformance_table(results)
+    _log("")
+    _log(f"{'Algorithm':<18}{'Vectors':>9}{'Encrypt':>9}{'Decrypt':>9}  Result")
+    _log("-" * 54)
+    for result in results:
+        _log(
+            f"{result.algorithm:<18}{result.total:>9}"
+            f"{result.encrypt_matches:>9}{result.decrypt_matches:>9}"
+            f"  {'PASS' if result.passed else 'FAIL'}"
+        )
+        if result.failures:
+            _log(f"    failing Count values (first 10): {result.failures[:10]}")
+    _log("-" * 54)
+
+    total_vectors = sum(r.total for r in results)
+    every_one_passed = all(r.passed for r in results)
+    _log(f"{len(results)} algorithms, {total_vectors} vectors, "
+         f"{'all PASS' if every_one_passed else 'FAILURES PRESENT'}")
+    _log("AES-128-GCM is not listed: it is OpenSSL, validated upstream, not "
+         "implemented in this project.")
     _log(f"Written to       : {path.relative_to(PROJECT_ROOT)}")
-    _log(f"Vector source    : {report.source_file}")
-    return 0 if report.passed else 1
+    return 0 if every_one_passed else 1
 
 
 def cmd_security_tests(config: ExperimentConfig) -> int:

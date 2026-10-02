@@ -1,24 +1,70 @@
-# Performance Evaluation of Ascon-AEAD128 and AES-128-GCM for Secure IoT Communication
+# Performance Evaluation of Ascon-AEAD128 against Lightweight AEAD Schemes and AES-128-GCM for Secure IoT Communication
 
 **A Proof-of-Concept Study**
 
-An experimental comparison of two authenticated-encryption-with-associated-data (AEAD)
-schemes on simulated smart-warehouse IoT sensor traffic:
+An experimental comparison of **seven** authenticated-encryption-with-associated-data
+(AEAD) schemes on simulated smart-warehouse IoT sensor traffic.
 
-- **Ascon-AEAD128** — the lightweight AEAD standardised in **NIST SP 800-232**
-- **AES-128-GCM** — the established baseline from **NIST SP 800-38D**
+| Algorithm | Standard / status | Role in this study |
+|---|---|---|
+| **Ascon-AEAD128** | **NIST SP 800-232** (2025) | the algorithm under study |
+| TinyJAMBU-128 | NIST-LWC finalist | comparator — smallest hardware footprint |
+| Xoodyak | NIST-LWC finalist | comparator — Keccak team, Ascon's closest rival |
+| Schwaemm256-128 | NIST-LWC finalist (SPARKLE) | comparator — software-oriented ARX |
+| GIFT-COFB | NIST-LWC finalist | comparator — block-cipher based, not a sponge |
+| AES-128-CCM | NIST SP 800-38C | comparator — what IEEE 802.15.4 / Zigbee deploys today |
+| AES-128-GCM | NIST SP 800-38D | the established baseline |
+
+Four of the five comparators are the NIST Lightweight Cryptography **finalists that
+Ascon was selected ahead of** in 2023. That is deliberate: it turns "is Ascon a good
+choice?" into a question this repository answers by measurement rather than by citing
+NIST's decision.
 
 ---
 
 ## 1. Research question
 
-> How suitable are Ascon-AEAD128 and AES-128-GCM for securing small IoT messages when
-> evaluated in terms of authenticated security functionality, encryption/decryption
-> latency, throughput, memory overhead, and communication overhead?
+> How suitable is Ascon-AEAD128, compared with other lightweight cryptographic
+> algorithms and with AES-128-GCM, for securing small IoT messages when evaluated in
+> terms of authenticated security functionality, encryption/decryption latency,
+> throughput, memory overhead, and communication overhead?
 
-The study is **not** designed to show that either algorithm wins. It is designed to
-produce measurements, in a documented environment, from which a bounded conclusion can
-be drawn — and to be explicit about the boundary. See [§14 Limitations](#14-limitations).
+The study is **not** designed to show that any algorithm wins. It is designed to produce
+measurements, in a documented environment, from which a bounded conclusion can be drawn
+— and to be explicit about the boundary. See [§14 Limitations](#14-limitations).
+
+### Where each dimension of that question is answered
+
+| Dimension | Evidence | Figures |
+|---|---|---|
+| Authenticated security functionality | `results/kat_results.csv` (6,534 official vectors), `results/security_results.csv` (70 attack tests) | 20 |
+| Encryption / decryption latency | `results/summary_results.csv`, `results/extended/summary_extended.csv` | 1, 2, 8, 9, 10, 13, 14, 19 |
+| Throughput | same | 3, 4, 11, 12 |
+| Memory overhead | `results/summary_memory.csv`, `results/extended/memory_extended.csv` | 5, 16 |
+| Communication overhead | `results/overhead_results.csv`, `results/extended/overhead_extended.csv` | 6, 7, 15 |
+
+### Two experiments, and why they are kept apart
+
+The repository contains **two** timing experiments rather than one, and the distinction
+matters when reading any figure:
+
+- **The core study** (`python main.py benchmark`, figures 1–8) compares
+  **Ascon-AEAD128 against AES-128-GCM** — the new standard against the deployed
+  incumbent.
+- **The extension** (`python scripts/run_extended_comparison.py`, figures 9–19) compares
+  **all seven algorithms** through one harness.
+
+They are separate because merging them would destroy the property that makes the
+extension readable. Ascon and the five lightweight comparators run as interpreted
+Python; AES-128-GCM runs inside OpenSSL as compiled C using the CPU's AES-NI
+instructions. Comparing two pure-Python series compares **algorithms**; comparing
+anything against AES-128-GCM compares **implementations and hardware**. Every extension
+figure marks the difference — solid lines for same-tier, dashed for AES-GCM, and AES-GCM
+excluded outright from the ranking figures.
+
+The **security** evidence (conformance and the defensive suite, figure 20) covers all
+seven in one run, because correctness and attack resistance do not depend on how fast
+the implementation is.
 
 ## 2. Cybersecurity motivation
 
@@ -72,15 +118,23 @@ which is this project.
               │                    └────────────┬─────────────┘
               │        ┌────────────────────────┘
               ▼        ▼
-        ┌───────────────────────────────────────────┐
-        │      AeadCipher   (src/aead_interface)    │  ← one interface, so the
-        ├─────────────────────┬─────────────────────┤    benchmark harness cannot
-        │   AES-128-GCM       │   Ascon-AEAD128     │    favour either path
-        │   src/aes_gcm.py    │  src/ascon_aead.py  │
-        │   OpenSSL / pyca    │  pyascon reference  │
-        │   96-bit nonce      │  128-bit nonce      │
-        │   128-bit tag       │  128-bit tag        │
-        └─────────────────────┴──────────┬──────────┘
+        ┌─────────────────────────────────────────────────────────────┐
+        │           AeadCipher   (src/aead_interface.py)              │
+        │   one interface for all seven, so no harness path can       │
+        │   favour one algorithm over another                         │
+        ├──────────────────────┬──────────────────────────────────────┤
+        │  CORE STUDY          │  EXTENSION  (src/lightweight/)       │
+        ├──────────┬───────────┼───────────┬──────────┬───────────────┤
+        │ AES-128  │ Ascon-    │ TinyJAMBU │ Xoodyak  │ Schwaemm256   │
+        │ -GCM     │ AEAD128   │ -128      │          │ -128          │
+        │          │           ├───────────┴──────────┴───────────────┤
+        │ OpenSSL  │ pyascon   │ GIFT-COFB            │ AES-128-CCM   │
+        │ (C,      │ reference │                      │               │
+        │ AES-NI)  │ (Python)  │ all pure Python, all validated       │
+        │ 96-bit   │ 128-bit   │ against 1089 official vectors each   │
+        │ nonce    │ nonce     │                                      │
+        │ 128-bit tag          │ 128-bit tags (TinyJAMBU: 64-bit)     │
+        └──────────┴───────────┴──────────────────────┬───────────────┘
                                          │
                     SecurePacket{ algorithm, aad, nonce, ciphertext‖tag }
                                          │
@@ -101,9 +155,14 @@ which is this project.
         ┌────────────────────────────────┴─────────────────────────────────┐
         ▼                                ▼                                 ▼
  src/security_tests.py           src/benchmark.py              src/analyze_results.py
- tamper / forge / replay         latency, throughput,          statistics, 8 figures
- → security_results.csv          memory, overhead              → summary_results.csv
-                                 → raw_results.csv                results/graphs/
+ src/kat.py                      core study, 2 algorithms      statistics, figures 1-8
+ all 7 algorithms:               latency, throughput,          plus figure 20
+ tamper / forge / replay,        memory, overhead              → summary_results.csv
+ 6534 official vectors           → raw_results.csv                results/graphs/
+ → security_results.csv
+ → kat_results.csv               src/extended_benchmark.py     src/extended_graphs.py
+ → figure 20                     all 7 algorithms, one         figures 9-19
+                                 harness → results/extended/   → results/graphs/
 ```
 
 **Why steps 2 and 4 are separate.** Step 2 runs on data nobody has authenticated yet, so
@@ -126,22 +185,33 @@ iot_crypto_project/
 ├── src/
 │   ├── __init__.py
 │   ├── config.py                every experimental parameter, in one place
-│   ├── aead_interface.py        the abstract AEAD both ciphers implement
+│   ├── aead_interface.py        the abstract AEAD all seven ciphers implement
 │   ├── aes_gcm.py               AES-128-GCM  (cryptography / OpenSSL)
 │   ├── ascon_aead.py            Ascon-AEAD128 (pyascon reference)
 │   ├── ascon_loader.py          implementation discovery + provenance
-│   ├── kat.py                   NIST SP 800-232 conformance testing
+│   ├── kat.py                   conformance testing, all implemented algorithms
 │   ├── sensor.py                synthetic smart-warehouse data
 │   ├── serialization.py         canonical encoding + AAD/payload split
 │   ├── nonce.py                 nonce budgets, reuse detection, birthday bounds
 │   ├── replay_protection.py     strict and sliding-window freshness policies
-│   ├── receiver.py              the gateway pipeline
-│   ├── security_tests.py        defensive tampering experiments
-│   ├── benchmark.py             the measurement harness
-│   ├── analyze_results.py       statistics and figures
-│   └── environment_info.py      reproducibility metadata capture
+│   ├── receiver.py              the gateway pipeline + the cipher registry
+│   ├── security_tests.py        defensive tampering experiments, all seven
+│   ├── benchmark.py             the core measurement harness (2 algorithms)
+│   ├── extended_benchmark.py    the extension harness (7 algorithms)
+│   ├── analyze_results.py       statistics, figures 1-8 and 20
+│   ├── extended_graphs.py       figures 9-19
+│   ├── environment_info.py      reproducibility metadata capture
+│   │
+│   └── lightweight/             the five comparison algorithms
+│       ├── __init__.py          the registry every other module reads
+│       ├── tinyjambu.py         TinyJAMBU-128   (NIST-LWC finalist)
+│       ├── xoodyak.py           Xoodyak         (NIST-LWC finalist)
+│       ├── schwaemm.py          Schwaemm256-128 (NIST-LWC finalist)
+│       ├── gift_cofb.py         GIFT-COFB       (NIST-LWC finalist)
+│       ├── aes_ccm.py           AES-128-CCM     (SP 800-38C, pure Python)
+│       └── _aes_core.py         the AES block function CCM is built on
 │
-├── tests/                       180 automated tests
+├── tests/                       232 automated tests
 │   ├── __init__.py
 │   ├── conftest.py              import-path fix + shared fixtures
 │   ├── test_sensor.py
@@ -149,6 +219,8 @@ iot_crypto_project/
 │   ├── test_aes.py
 │   ├── test_ascon.py
 │   ├── test_kat.py              ← conformance to official vectors
+│   ├── test_lightweight_kat.py  ← the same bar, for all five comparators
+│   ├── test_algorithm_coverage.py ← guards that the comparison stays at seven
 │   ├── test_security.py
 │   ├── test_replay.py
 │   ├── test_receiver.py
@@ -156,29 +228,39 @@ iot_crypto_project/
 │   └── test_benchmark.py
 │
 ├── scripts/
-│   └── setup_ascon.py           fetch + verify the Ascon reference code
+│   ├── setup_ascon.py           fetch + verify the Ascon reference code
+│   └── run_extended_comparison.py   the seven-algorithm experiment
 │
-├── third_party/                 created by setup_ascon.py
-│   ├── pyascon/ascon.py         the implementation under test
-│   ├── ascon_kat/…KAT….txt      official test vectors
+├── third_party/
+│   ├── pyascon/ascon.py         the implementation under test  ┐ fetched by
+│   ├── ascon_kat/…KAT….txt      official Ascon vectors         ┘ setup_ascon.py
+│   ├── lwc_kat/*.txt            official NIST-LWC vectors for the four
+│   │                            finalists (committed, 1089 vectors each)
 │   └── PROVENANCE.json          URLs, commit hashes, SHA-256 of each file
 │
 ├── data/
 │   └── sensor_messages.csv      generated
 │
 ├── results/
-│   ├── raw_results.csv          every individual timing sample
-│   ├── summary_results.csv      aggregated statistics
+│   ├── raw_results.csv          every individual timing sample (not committed)
+│   ├── summary_results.csv      aggregated statistics, core study
 │   ├── summary_memory.csv
 │   ├── memory_results.csv
 │   ├── overhead_results.csv
-│   ├── security_results.csv
-│   ├── kat_results.csv
+│   ├── security_results.csv     70 attack tests x 7 algorithms
+│   ├── kat_results.csv          6534 official vectors, one row per algorithm
 │   ├── environment.json
-│   └── graphs/                  8 figures
+│   ├── extended/                the seven-algorithm experiment
+│   │   ├── summary_extended.csv
+│   │   ├── memory_extended.csv
+│   │   ├── overhead_extended.csv
+│   │   ├── workload_extended.csv
+│   │   └── environment_extended.json
+│   └── graphs/                  20 figures
 │
 └── docs/
     ├── METHODOLOGY.md
+    ├── EXTENDED_ALGORITHMS.md   the five comparators: sources and validation
     ├── REPORT_GUIDE.md
     └── THESIS_EXTENSION.md
 ```
@@ -194,6 +276,9 @@ iot_crypto_project/
 | `scripts/setup_ascon.py`, `third_party/` | Reproducibility: exact commit hashes and file hashes, recorded automatically. |
 | `tests/conftest.py` | Fixes `ModuleNotFoundError: No module named 'src'` permanently. |
 | Extra results files | `memory_results.csv`, `overhead_results.csv`, `kat_results.csv` — one file per measurement type is easier to cite than one wide file. |
+| `src/lightweight/` | The title promises a comparison with *other lightweight algorithms*. Four NIST-LWC finalists and AES-128-CCM are implemented in pure Python so that they sit in the same implementation tier as this project's Ascon, which is what makes the comparison a comparison of **algorithms** rather than of **implementations**. |
+| `src/extended_benchmark.py`, `src/extended_graphs.py` | A second harness rather than a widened first one, so the committed core results stay valid and the two tiers can be reported side by side without one contaminating the other. |
+| `tests/test_algorithm_coverage.py` | A comparison does not break when it narrows — it quietly covers fewer algorithms. These tests fail loudly instead. |
 
 ---
 
@@ -372,8 +457,20 @@ Result           : PASS
 > at commit `<COMMIT FROM third_party/PROVENANCE.json>` (CC0-1.0). Conformance to
 > NIST SP 800-232 was verified against the 1089 known-answer test vectors published in
 > the Ascon team's reference C implementation, <https://github.com/ascon/ascon-c>,
-> commit `<COMMIT FROM PROVENANCE.json>`; all vectors matched. `[VERIFY CITATION]` for
-> the formal bibliography entries of NIST SP 800-232 and the Ascon specification.
+> commit `<COMMIT FROM PROVENANCE.json>`; all vectors matched. The standard itself is
+> National Institute of Standards and Technology, *Ascon-Based Lightweight Cryptography
+> Standards for Constrained Devices: Authenticated Encryption, Hash, and Extendable
+> Output Functions*, NIST Special Publication 800-232, August 2025.
+
+For the five comparison algorithms, cite them as implementations written for the study
+and validated rather than as reference code:
+
+> TinyJAMBU-128, Xoodyak, Schwaemm256-128, GIFT-COFB and AES-128-CCM were implemented in
+> pure Python for this study so that they occupy the same implementation tier as the
+> Ascon-AEAD128 under test. Each was validated against the 1089 known-answer vectors
+> published with its NIST Lightweight Cryptography submission; AES-128-CCM, which has no
+> such vector file, was validated by exact agreement with OpenSSL over the same 33×33
+> length grid. All 6534 vectors matched (`results/kat_results.csv`).
 
 Both commit hashes and the SHA-256 of both files are recorded automatically in
 `third_party/PROVENANCE.json` and copied into `results/environment.json` on every run.
@@ -397,18 +494,22 @@ python scripts\setup_ascon.py --check
 Every command accepts `--quick` (tiny iteration counts, smoke test) or `--full`
 (default, reportable). Run from the project root with the virtual environment active.
 
-| Purpose | Command |
-|---|---|
-| Verify environment + Ascon | `python main.py check` |
-| Generate sensor data | `python main.py generate-data` |
-| Run unit tests | `pytest` |
-| Run conformance tests | `python main.py kat` |
-| Run security tests | `python main.py security-tests` |
-| **Quick** benchmark (smoke test) | `python main.py benchmark --quick` |
-| **Full** benchmark | `python main.py benchmark --full` |
-| Statistics + graphs | `python main.py analyze` |
-| Live demonstration | `python main.py demo` |
-| Everything, in order | `python main.py all` |
+| Purpose | Command | Algorithms covered |
+|---|---|---|
+| Verify environment + Ascon | `python main.py check` | — |
+| Generate sensor data | `python main.py generate-data` | — |
+| Run unit tests | `pytest` | all 7 |
+| Run conformance tests | `python main.py kat` | all 6 implemented here |
+| Run security tests | `python main.py security-tests` | all 7 |
+| **Quick** benchmark (smoke test) | `python main.py benchmark --quick` | core 2 |
+| **Full** benchmark | `python main.py benchmark --full` | core 2 |
+| Statistics + figures 1–8, 20 | `python main.py analyze` | — |
+| Live demonstration | `python main.py demo` | core 2 |
+| Everything above, in order | `python main.py all` | — |
+| **The seven-algorithm experiment** | `python scripts/run_extended_comparison.py` | **all 7** |
+
+`python main.py all` does **not** include the extension: it is a separate experiment with
+its own harness and its own output directory. Run it explicitly.
 
 ### Recommended first run
 
@@ -427,7 +528,28 @@ If all of that succeeds, commit, then run the real campaign:
 ```powershell
 python main.py benchmark --full
 python main.py analyze
+python scripts/run_extended_comparison.py
 ```
+
+### `python scripts/run_extended_comparison.py` — the seven-algorithm run
+
+This is the experiment behind figures 9–19 and behind every claim in the report about
+Ascon versus the other lightweight algorithms. Three profiles:
+
+```powershell
+python scripts/run_extended_comparison.py --quick      :: smoke test, not reportable
+python scripts/run_extended_comparison.py              :: default, reportable
+python scripts/run_extended_comparison.py --full       :: longest, tightest intervals
+```
+
+The script **refuses to run** if any algorithm fails its known-answer tests, because a
+timing measurement of an implementation that computes the wrong function measures
+nothing. Output goes to `results/extended/` and `results/graphs/graph09…graph19`.
+
+> **Run it on the same machine as the core benchmark.** The two experiments write
+> `results/environment.json` and `results/extended/environment_extended.json`
+> independently. If they record different machines, figures 1–8 and 9–19 are not
+> comparable with each other and a reader will notice.
 
 ### `pytest` — expected output
 
@@ -450,7 +572,10 @@ pytest -k "replay or nonce"      :: run a subset by name
 ```
 
 **A failure in `tests/test_kat.py` invalidates every Ascon measurement in the project.**
-Fix it before running anything else.
+A failure in `tests/test_lightweight_kat.py` invalidates every comparison figure.
+A failure in `tests/test_algorithm_coverage.py` means the study has silently narrowed —
+an algorithm is being benchmarked but is no longer reaching the receiver or the security
+suite. Fix any of these before running anything else.
 
 ### `python main.py demo` — what to run in your viva
 
@@ -477,8 +602,8 @@ one screen and demonstrates every security property in the project.
 | `summary_results.csv` | Aggregated by (algorithm, size, operation): `samples, mean_ns, median_ns, stdev_ns, min_ns, max_ns, p95_ns, ci95_lower_ns, ci95_upper_ns, throughput_mb_s_median, messages_per_second_median` |
 | `memory_results.csv` / `summary_memory.csv` | `tracemalloc` peak Python-heap allocation per operation. **Read the caveat in §14.3 before quoting these.** |
 | `overhead_results.csv` | `plaintext_size, ciphertext_size, tag_bytes, nonce_bytes, expansion_bytes, wire_overhead_bytes, overhead_percent` |
-| `security_results.csv` | One row per (algorithm × scenario): `expected_result, actual_result, trials, unexpected_outcomes, passed` |
-| `kat_results.csv` | Conformance outcome, vector count, source file, pass/fail |
+| `security_results.csv` | One row per (algorithm × scenario) for **all seven algorithms** — 70 rows: `expected_result, actual_result, trials, unexpected_outcomes, passed` |
+| `kat_results.csv` | One row per implemented algorithm — 6 rows, 1089 vectors each, 6 534 in total: `algorithm, standard, method, vector_source, vectors_total, encrypt_matches, decrypt_matches, failed_counts, passed`. AES-128-GCM is absent by design: it is OpenSSL, validated upstream, not implemented here. |
 | `environment.json` | OS, CPU, RAM, Python, OpenSSL version, `cryptography` version, Ascon commit + SHA-256, every experiment parameter, timestamp |
 | `graphs/graph1_encrypt_latency.png` | Encryption latency vs message size (log-log, 95% CI error bars, harness noise floor drawn) |
 | `graphs/graph2_decrypt_latency.png` | Decryption latency vs message size |
@@ -488,6 +613,27 @@ one screen and demonstrates every security property in the project.
 | `graphs/graph6_communication_overhead.png` | Overhead as % of payload vs plaintext size |
 | `graphs/graph7_ciphertext_size.png` | Absolute ciphertext size vs plaintext size |
 | `graphs/graph8_small_payload_focus.png` | 32–512 byte range — the sizes most representative of IoT sensor traffic |
+| `graphs/graph20_security_matrix.png` | **All seven algorithms × ten attacks**, plus the one column where they are not equal: blind-forgery resistance. Rendered by `python main.py analyze`. |
+
+### `results/extended/` — the seven-algorithm experiment
+
+Produced by `python scripts/run_extended_comparison.py`.
+
+| File | Contents |
+|---|---|
+| `summary_extended.csv` | Aggregated timings for all seven algorithms, with a `tier` column (`pure-python` / `native-c`) that every figure uses to decide solid vs dashed |
+| `memory_extended.csv` | Peak Python-heap allocation per operation, per algorithm |
+| `overhead_extended.csv` | Nonce, tag and total wire overhead per algorithm per payload size — fixed by each specification, so these are the figures that survive a change of hardware |
+| `workload_extended.csv` | End-to-end rate on the project's own generated traffic, with its real associated data |
+| `environment_extended.json` | The machine and parameters for this run, recorded separately from the core run |
+| `graphs/graph09…graph12` | Encryption and decryption latency and throughput, all seven |
+| `graphs/graph13_lw_small_message_ranking.png` | The ranking at a 128-byte payload |
+| `graphs/graph14_lw_ascon_relative_speed.png` | Every algorithm as a multiple of Ascon, per size |
+| `graphs/graph15_lw_communication_overhead.png` | Overhead, with the nonce/tag split that explains it |
+| `graphs/graph16_lw_peak_memory.png` | Transient memory, pure-Python tier only |
+| `graphs/graph17_lw_end_to_end_rate.png` | Messages secured per second on real traffic |
+| `graphs/graph18_lw_multimetric_summary.png` | Five metrics normalised, plus an explicitly arbitrary composite |
+| `graphs/graph19_lw_ascon_vs_finalists.png` | **Ascon against the four NIST-LWC finalists** — the figure with no implementation-tier confound in it |
 
 **No measured value appears anywhere in this repository that was not produced by running
 the code.** There are no example numbers, no illustrative figures, and no placeholder
@@ -562,8 +708,11 @@ For AES-GCM the failure is catastrophic. GCM is counter mode plus GHASH; a repea
 emits the same keystream twice, so XORing the two ciphertexts cancels it and leaks the
 XOR of the plaintexts. Worse, the collision lets an adversary solve for the GHASH subkey
 `H`, breaking *authentication* for every message under that key — the "forbidden attack".
-`[VERIFY CITATION]` — Joux's original note, and Böck, Zauner, Devlin, Somorovsky &
-Jovanovic, *Nonce-Disrespecting Adversaries*, USENIX WOOT 2016.
+This is A. Joux's "forbidden attack"; for a measured demonstration that it is not merely
+theoretical, see H. Böck, A. Zauner, S. Devlin, J. Somorovsky and P. Jovanovic,
+*Nonce-Disrespecting Adversaries: Practical Forgery Attacks on GCM in TLS*, 10th USENIX
+Workshop on Offensive Technologies (WOOT 16), Austin, TX, USENIX Association, August
+2016, which found repeated nonces on live HTTPS servers and forged traffic against them.
 
 This project uses random nonces from the OS CSPRNG. That needs no state and no
 coordination between devices, at the cost of a birthday bound. With an *n*-bit nonce,
@@ -667,12 +816,34 @@ proof-of-concept.
 Not everything is contaminated by the implementation gap. These findings hold regardless
 of implementation quality and are safe to state plainly:
 
-- **Ciphertext expansion**: 16 bytes for both — a structural property of the schemes
-- **Wire overhead**: 28 bytes (AES: 16 tag + 12 nonce) vs 32 bytes (Ascon: 16 + 16)
+- **Ciphertext expansion**: 16 bytes for every algorithm except TinyJAMBU-128, which
+  expands by 8 — a structural property of the schemes, not a measurement
+- **Wire overhead**: 20 bytes (TinyJAMBU: 8 tag + 12 nonce), 28 (AES-GCM/CCM: 16 + 12),
+  32 (Ascon, Xoodyak, GIFT-COFB: 16 + 16), 48 (Schwaemm: 16 + 32)
 - **Every security property**: tamper detection, AAD integrity, wrong-key rejection,
-  truncation handling, replay rejection — all verified for both
-- **Conformance**: the Ascon implementation matches the official standard vectors
+  truncation handling, replay rejection — verified for **all seven**, figure 20
+- **Conformance**: every algorithm implemented here reproduces its official published
+  vectors, 1 089 each, 6 534 in total
 - **Relative cost across message sizes** within one implementation
+
+**And, crucially, the whole of the extension.** The five comparators were implemented in
+pure Python *for this reason*: Ascon and all five sit in the same implementation tier, so
+figures 9–19 compare algorithms rather than implementations. The implementation gap
+described in §14.1 applies only to the AES-128-GCM series, which every extension figure
+marks as a dashed line and which the ranking figures exclude outright.
+
+Figure 19 is the strongest claim the project can make, because it has no confound in it
+at all: five pure-Python implementations, each validated against 1 089 official vectors,
+measured through one harness on one machine in one run, with the algorithm as the only
+variable. Ascon-AEAD128 is faster than all four NIST-LWC finalists at every payload size
+tested.
+
+One result runs the other way and is reported as found: the pure-Python **AES-128-CCM**
+is faster than this project's Ascon at small payloads, crossing over only around 4 KB.
+The explanation is CPython's cost model — table lookups are cheap in the interpreter and
+64-bit bitwise arithmetic is not, which is the opposite of a constrained
+microcontroller's cost model, and the opposite of the environment Ascon was designed
+for. It is in the results because it happened, not because it helps.
 
 ### 14.3 Memory figures are Python-heap only
 
@@ -920,11 +1091,31 @@ Third-party material fetched by `scripts/setup_ascon.py`, both **CC0-1.0**:
 - `pyascon` — Maria Eichlseder — <https://github.com/meichlseder/pyascon>
 - `ascon-c` KAT vectors — the Ascon team — <https://github.com/ascon/ascon-c>
 
-Exact commits and file hashes: `third_party/PROVENANCE.json`.
+Known-answer vectors for the four NIST-LWC finalists, committed under
+`third_party/lwc_kat/`, come from each team's own submission package; sources and file
+hashes are recorded in `third_party/lwc_kat/PROVENANCE.json`. Exact commits and file
+hashes for the Ascon material: `third_party/PROVENANCE.json`.
 
-Standards referenced (verify full bibliographic details before submission —
-`[VERIFY CITATION]`):
+### Standards referenced
 
-- NIST SP 800-232 — *Ascon-Based Lightweight Cryptography Standards for Constrained Devices*
-- NIST SP 800-38D — *Recommendation for Block Cipher Modes of Operation: Galois/Counter Mode (GCM) and GMAC*
-- NIST FIPS 197 — *Advanced Encryption Standard (AES)*
+- **NIST SP 800-232** — *Ascon-Based Lightweight Cryptography Standards for Constrained
+  Devices: Authenticated Encryption, Hash, and Extendable Output Functions*. National
+  Institute of Standards and Technology, August 2025.
+  <https://csrc.nist.gov/pubs/sp/800/232/final>
+- **NIST SP 800-38D** — *Recommendation for Block Cipher Modes of Operation:
+  Galois/Counter Mode (GCM) and GMAC*. NIST, November 2007.
+- **NIST SP 800-38C** — *Recommendation for Block Cipher Modes of Operation: The CCM
+  Mode for Authentication and Confidentiality*. NIST, May 2004 (updated 2007).
+- **NIST FIPS 197** — *Advanced Encryption Standard (AES)*. NIST, November 2001
+  (updated May 2023).
+- **NIST IR 8454** — *Status Report on the Final Round of the NIST Lightweight
+  Cryptography Standardization Process*. NIST, June 2023 — the report that selected
+  Ascon ahead of the four finalists used as comparators here.
+
+### Implementation note on the comparators
+
+The five lightweight comparators in `src/lightweight/` are **pure-Python implementations
+written for this project**, not vendored reference code. Each reproduces its
+specification's published vectors exactly (`python main.py kat`), which is what licenses
+their use as measurement subjects. None is constant-time and none should protect real
+data. Their design sources are documented in `docs/EXTENDED_ALGORITHMS.md`.

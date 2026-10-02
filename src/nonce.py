@@ -9,9 +9,14 @@ counter mode plus a GHASH authenticator; reusing a nonce under one key emits
 the same keystream twice, so XORing the two ciphertexts cancels the keystream
 and leaks the XOR of the two plaintexts.  Worse, the collision also allows an
 adversary to solve for the GHASH subkey H, which breaks *authentication* for
-every message under that key from then on -- a "forbidden attack" (Joux; and
-see Böck, Zauner, Devlin, Somorovsky & Jovanovic, "Nonce-Disrespecting
-Adversaries", USENIX WOOT 2016).  [VERIFY CITATION for exact page/DOI.]
+every message under that key from then on.  This is Joux's "forbidden attack";
+for a measured demonstration that it is not merely theoretical, see H. Boeck,
+A. Zauner, S. Devlin, J. Somorovsky and P. Jovanovic, "Nonce-Disrespecting
+Adversaries: Practical Forgery Attacks on GCM in TLS", 10th USENIX Workshop on
+Offensive Technologies (WOOT 16), Austin, TX, USENIX Association, August 2016,
+https://www.usenix.org/conference/woot16/workshop-program/presentation/bock --
+which found repeated nonces on live HTTPS servers and forged traffic against
+them.
 
 Ascon's mode also requires unique nonces; reuse likewise leaks plaintext
 relationships. Neither algorithm is misuse-resistant in the SIV sense.
