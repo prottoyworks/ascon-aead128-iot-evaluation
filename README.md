@@ -269,7 +269,7 @@ iot_crypto_project/
 
 | Addition | Reason |
 |---|---|
-| `src/aead_interface.py` | Both ciphers go through one abstract class, so the benchmark cannot advantage either through harness dispatch. This is a **fairness control**, not decoration. |
+| `src/aead_interface.py` | All seven ciphers go through one abstract class, so no algorithm can be advantaged by harness dispatch. This is a **fairness control**, not decoration, and it is what makes a seven-way comparison meaningful. |
 | `src/ascon_loader.py` | Isolates the fragile "where did the code come from?" concern from the clean cipher wrapper, and rejects the obsolete PyPI package explicitly. |
 | `src/kat.py` + `tests/test_kat.py` | Conformance testing is a distinct research claim from correctness testing and deserves its own module. |
 | `src/nonce.py` | Nonce management is a first-class research concern in the brief; giving it a module makes the birthday-bound argument testable. |
@@ -579,7 +579,8 @@ suite. Fix any of these before running anything else.
 
 ### `python main.py demo` — what to run in your viva
 
-Walks one message through the whole channel and prints, for both algorithms: the AAD/
+Walks one message through the whole channel and prints, for the two core algorithms
+(Ascon-AEAD128 and AES-128-GCM): the AAD/
 payload split, key/nonce/tag sizes, the ciphertext, then live rejection of a flipped
 ciphertext bit, a `WH-001 → WH-999` AAD forgery, a wrong key, and a replay. It fits on
 one screen and demonstrates every security property in the project.
@@ -1037,19 +1038,7 @@ matplotlib.use("Agg")
 
 ---
 
-## 16. Five-week plan
-
-| Week | Tasks | Deliverable |
-|---|---|---|
-| **1 — Research & environment** | Read NIST SP 800-232 and SP 800-38D. Study AEAD, AES-GCM and Ascon. Set up Python, venv, VS Code, Git. Run `setup_ascon.py`. Generate sensor data. Begin literature review. | Working environment; `data/sensor_messages.csv`; annotated bibliography started |
-| **2 — Cryptographic implementation** | Understand `aes_gcm.py` and `ascon_aead.py`. Run `pytest`. Run `main.py kat` and record the conformance result. Verify AAD handling and round trips. | Both algorithms verified; KAT PASS recorded; `pytest` green |
-| **3 — Security tests & benchmarking** | Run `security-tests`. Study each scenario until you can explain *why* it must be rejected. Run `benchmark --quick`, then `--full`. | `security_results.csv`; `raw_results.csv`; `environment.json` |
-| **4 — Analysis** | Run `analyze`. Read `summary_results.csv`. Compare mean vs median. Check every latency against the harness noise floor. Draft Results and Discussion. | Tables, 8 figures, `summary_results.csv`, first interpretation |
-| **5 — Documentation** | Finish all seven chapters. Write the limitations chapter *carefully*. Resolve every `[VERIFY CITATION]`. Final `pytest`. Prepare the viva demo (`main.py demo`). | Submission-ready report, code and presentation |
-
----
-
-## 17. Future thesis extension
+## 16. Future thesis extension
 
 This project is **Phase 1**. See [`docs/THESIS_EXTENSION.md`](docs/THESIS_EXTENSION.md)
 for the architecture argument.
@@ -1057,9 +1046,11 @@ for the architecture argument.
 What exists now:
 
 ```
-sensor simulation + secure message structure + AES-GCM + Ascon-AEAD128
+sensor simulation + secure message structure
++ seven AEAD schemes: Ascon-AEAD128, TinyJAMBU-128, Xoodyak,
+  Schwaemm256-128, GIFT-COFB, AES-128-CCM, AES-128-GCM
 + AEAD/AAD handling + replay protection + benchmarking framework
-+ security evaluation + conformance testing
++ security evaluation across all seven + conformance testing (6534 vectors)
 ```
 
 What the thesis adds:
@@ -1074,15 +1065,17 @@ smart warehouse → full case study
 hardware benchmarking → microcontroller, optimised C, energy measurement
 ```
 
-The key structural point for your proposal: `CIPHER_REGISTRY` in `src/receiver.py` is a
-one-line-per-algorithm dictionary, and the `SecurePacket` already carries an algorithm
-label that is covered by the authentication tag. Crypto-agility is not a rewrite — it is
-an extension of a hook that already exists and is already tested
-(`test_receiver.py::test_receiver_handles_both_algorithms_simultaneously`).
+The key structural point for a thesis proposal: `CIPHER_REGISTRY` in `src/receiver.py`
+already dispatches seven algorithms, and `SecurePacket` already carries an algorithm
+label covered by the authentication tag. Crypto-agility is therefore not a rewrite but an
+extension of a mechanism that exists, is exercised by every security test, and is guarded
+by `tests/test_algorithm_coverage.py`. Adding a post-quantum scheme means implementing
+the `AeadCipher` interface once; nothing in the receiver, the benchmark harness or the
+figures needs to change.
 
 ---
 
-## 18. Licence and attribution
+## 17. Licence and attribution
 
 Project code: use as you see fit for your coursework.
 
